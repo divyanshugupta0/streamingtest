@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Audio Stream</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.4.7/peerjs.min.js"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #64748b;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --text-secondary: #475569;
+            --danger: #ef4444;
+            --danger-dark: #dc2626;
+            --success: #22c55e;
+            --border: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: var(--surface);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--background);
+            border-radius: 2rem;
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--secondary);
+            transition: background-color 0.3s ease;
+        }
+
+        .status-indicator.active {
+            background: var(--success);
+            box-shadow: 0 0 12px var(--success);
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 3rem;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 0.75rem;
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn svg {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover svg {
+            transform: scale(1.1);
+        }
+
+        .btn-stop {
+            background: var(--danger);
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-stop:hover {
+            background: var(--danger-dark);
+            box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+        }
+
+        .connected-users {
+            background: var(--surface);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .connected-users h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 1.5rem;
+        }
+
+        .user-list {
+            list-style: none;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--background);
+            border-radius: 0.75rem;
+            transition: transform 0.2s ease;
+        }
+
+        .user-item:hover {
+            transform: translateX(4px);
+        }
+
+        .user-item span {
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .user-item .btn {
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            background: none;
+            color: var(--danger);
+            box-shadow: none;
+        }
+
+        .user-item .btn:hover {
+            background: rgba(239, 68, 68, 0.1);
+            transform: none;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 2rem;
+            background: var(--surface);
+            color: var(--text);
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            display: none;
+            animation: slideUp 0.3s ease-out;
+            z-index: 1000;
+            font-weight: 500;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%) scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Live Audio Stream</h1>
+            <div class="status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">Not Streaming</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startStream">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                Start Streaming
+            </button>
+            <button class="btn" id="shareLink">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                Share Link
+            </button>
+        </div>
+
+        <div class="connected-users">
+            <h2>Connected Users</h2>
+            <ul class="user-list" id="userList">
+                <!-- Connected users will be inserted here -->
+            </ul>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        let peer;
+        let stream;
+        let connections = new Set();
+        const startStreamBtn = document.getElementById('startStream');
+        const shareLinkBtn = document.getElementById('shareLink');
+        const userList = document.getElementById('userList');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const notification = document.getElementById('notification');
+
+        // Initialize PeerJS
+        function initPeer() {
+            peer = new Peer();
+            
+            peer.on('open', id => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const hostId = urlParams.get('host');
+                
+                if (hostId && hostId !== id) {
+                    connectToHost(hostId);
+                }
+            });
+
+            peer.on('connection', conn => {
+                handleNewConnection(conn);
+            });
+
+            peer.on('call', call => {
+                call.answer();
+                call.on('stream', remoteStream => {
+                    const audio = new Audio();
+                    audio.srcObject = remoteStream;
+                    audio.play();
+                });
+            });
+        }
+
+        function handleNewConnection(conn) {
+            connections.add(conn);
+            updateUserList();
+
+            conn.on('close', () => {
+                connections.delete(conn);
+                updateUserList();
+            });
+
+            showNotification('New user connected');
+        }
+
+        function connectToHost(hostId) {
+            const conn = peer.connect(hostId);
+            startStreamBtn.style.display = 'none';
+            shareLinkBtn.style.display = 'none';
+            statusText.textContent = 'Connected to stream';
+        }
+
+        async function startStreaming() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                connections.forEach(conn => {
+                    peer.call(conn.peer, stream);
+                });
+
+                startStreamBtn.textContent = 'Stop Streaming';
+                startStreamBtn.classList.add('btn-stop');
+                statusIndicator.classList.add('active');
+                statusText.textContent = 'Streaming';
+                showNotification('Stream started');
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                showNotification('Error accessing microphone');
+            }
+        }
+
+        function stopStreaming() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            startStreamBtn.textContent = 'Start Streaming';
+            startStreamBtn.classList.remove('btn-stop');
+            statusIndicator.classList.remove('active');
+            statusText.textContent = 'Not Streaming';
+            showNotification('Stream stopped');
+        }
+
+        function updateUserList() {
+            userList.innerHTML = '';
+            connections.forEach(conn => {
+                const li = document.createElement('li');
+                li.className = 'user-item';
+                li.innerHTML = `
+                    <span>User ${conn.peer.slice(0, 6)}...</span>
+                    <button class="btn" onclick="disconnectUser('${conn.peer}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6L6 18M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                `;
+                userList.appendChild(li);
+            });
+        }
+
+        function disconnectUser(peerId) {
+            connections.forEach(conn => {
+                if (conn.peer === peerId) {
+                    conn.close();
+                }
+            });
+        }
+
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        startStreamBtn.addEventListener('click', () => {
+            if (!stream) {
+                startStreaming();
+            } else {
+                stopStreaming();
+            }
+        });
+
+        shareLinkBtn.addEventListener('click', () => {
+            const url = `${window.location.origin}${window.location.pathname}?host=${peer.id}`;
+            navigator.clipboard.writeText(url);
+            showNotification('Share link copied to clipboard');
+        });
+
+        // Initialize the application
+        initPeer();
+    </script>
+</body>
+</html>
