@@ -3,33 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Audio Stream</title>
+    <title>Audio Stream</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.4.7/peerjs.min.js"></script>
     <style>
         :root {
-            --primary: #3b82f6;
-            --primary-dark: #2563eb;
-            --secondary: #64748b;
-            --background: #f8fafc;
+            --gradient-start: #4f46e5;
+            --gradient-end: #7c3aed;
             --surface: #ffffff;
-            --text: #0f172a;
-            --text-secondary: #475569;
+            --background: #f8fafc;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --accent: #8b5cf6;
             --danger: #ef4444;
-            --danger-dark: #dc2626;
-            --success: #22c55e;
-            --border: #e2e8f0;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            --success: #10b981;
+            --border: rgba(148, 163, 184, 0.2);
+            --shadow-color: rgba(79, 70, 229, 0.1);
         }
 
         body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--background);
-            color: var(--text);
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            color: var(--text-primary);
             line-height: 1.5;
         }
 
@@ -42,17 +39,31 @@
         .header {
             text-align: center;
             margin-bottom: 3rem;
-            padding: 2rem;
+            padding: 3rem;
             background: var(--surface);
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 2rem;
+            box-shadow: 0 20px 40px var(--shadow-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
         }
 
         .header h1 {
-            font-size: 2.5rem;
+            font-size: 3rem;
             font-weight: 800;
-            color: var(--primary);
-            margin-bottom: 1rem;
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1.5rem;
         }
 
         .status {
@@ -61,26 +72,48 @@
             gap: 0.75rem;
             padding: 0.75rem 1.5rem;
             background: var(--background);
-            border-radius: 2rem;
-            font-weight: 500;
+            border-radius: 1.5rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            border: 2px solid var(--border);
+        }
+
+        .status.streaming {
+            color: var(--success);
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
         }
 
         .status-indicator {
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            background: var(--secondary);
-            transition: background-color 0.3s ease;
+            background: var(--text-secondary);
+            transition: all 0.3s ease;
         }
 
         .status-indicator.active {
             background: var(--success);
-            box-shadow: 0 0 12px var(--success);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
         }
 
         .controls {
             display: flex;
-            gap: 1rem;
+            gap: 1.5rem;
             justify-content: center;
             margin-bottom: 3rem;
         }
@@ -88,38 +121,32 @@
         .btn {
             padding: 1rem 2rem;
             border: none;
-            border-radius: 0.75rem;
-            background: var(--primary);
-            color: white;
+            border-radius: 1.5rem;
             font-weight: 600;
             font-size: 1rem;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+            transition: all 0.3s ease;
+            color: white;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            box-shadow: 0 8px 16px var(--shadow-color);
         }
 
         .btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px var(--shadow-color);
         }
 
         .btn:active {
             transform: translateY(0);
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         .btn svg {
             width: 20px;
             height: 20px;
-            transition: transform 0.2s ease;
+            transition: transform 0.3s ease;
         }
 
         .btn:hover svg {
@@ -127,65 +154,66 @@
         }
 
         .btn-stop {
-            background: var(--danger);
-            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
-        }
-
-        .btn-stop:hover {
-            background: var(--danger-dark);
-            box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+            background: linear-gradient(135deg, var(--danger), #dc2626);
         }
 
         .connected-users {
             background: var(--surface);
-            border-radius: 1rem;
+            border-radius: 2rem;
             padding: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 20px 40px var(--shadow-color);
         }
 
         .connected-users h2 {
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--text);
+            color: var(--text-primary);
             margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
         }
 
         .user-list {
             list-style: none;
             display: grid;
             gap: 1rem;
+            padding: 0;
         }
 
         .user-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem;
+            padding: 1rem 1.5rem;
             background: var(--background);
-            border-radius: 0.75rem;
-            transition: transform 0.2s ease;
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+            border: 2px solid var(--border);
         }
 
         .user-item:hover {
             transform: translateX(4px);
+            border-color: var(--accent);
         }
 
         .user-item span {
-            font-weight: 500;
+            font-weight: 600;
             color: var(--text-secondary);
         }
 
-        .user-item .btn {
+        .user-item .btn-disconnect {
             padding: 0.5rem;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             background: none;
             color: var(--danger);
-            box-shadow: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
-        .user-item .btn:hover {
+        .user-item .btn-disconnect:hover {
             background: rgba(239, 68, 68, 0.1);
-            transform: none;
+            transform: rotate(90deg);
         }
 
         .notification {
@@ -194,13 +222,14 @@
             right: 2rem;
             padding: 1rem 2rem;
             background: var(--surface);
-            color: var(--text);
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            color: var(--text-primary);
+            border-radius: 1rem;
+            box-shadow: 0 20px 40px var(--shadow-color);
             display: none;
             animation: slideUp 0.3s ease-out;
             z-index: 1000;
             font-weight: 500;
+            border-left: 4px solid var(--accent);
         }
 
         @keyframes slideUp {
@@ -237,8 +266,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>System Audio Stream</h1>
-            <div class="status">
+            <h1>Audio Stream</h1>
+            <div class="status" id="statusContainer">
                 <div class="status-indicator" id="statusIndicator"></div>
                 <span id="statusText">Not Streaming</span>
             </div>
@@ -246,14 +275,14 @@
 
         <div class="controls">
             <button class="btn" id="startStream">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <circle cx="12" cy="12" r="3"></circle>
                 </svg>
-                Start Streaming
+                Start Stream
             </button>
             <button class="btn" id="shareLink">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                 </svg>
@@ -273,15 +302,38 @@
         let peer;
         let stream;
         let connections = new Set();
+        let audioContext;
+        let mediaStreamDestination;
+        
+        // DOM Elements
         const startStreamBtn = document.getElementById('startStream');
         const shareLinkBtn = document.getElementById('shareLink');
         const userList = document.getElementById('userList');
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
+        const statusContainer = document.getElementById('statusContainer');
         const notification = document.getElementById('notification');
-
+        
+        function initAudioContext() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                mediaStreamDestination = audioContext.createMediaStreamDestination();
+            } catch (e) {
+                console.error('AudioContext initialization failed:', e);
+                showNotification('Audio initialization failed');
+            }
+        }
+        
         function initPeer() {
-            peer = new Peer();
+            peer = new Peer({
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                },
+                debug: 2
+            });
             
             peer.on('open', id => {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -291,97 +343,169 @@
                     connectToHost(hostId);
                 }
             });
-
-            peer.on('connection', conn => {
-                handleNewConnection(conn);
-            });
-
-            peer.on('call', call => {
-                call.answer();
-                call.on('stream', remoteStream => {
-                    const audio = new Audio();
-                    audio.srcObject = remoteStream;
-                    audio.play();
-                });
-            });
+        
+            peer.on('error', handlePeerError);
+            peer.on('connection', handleNewConnection);
+            peer.on('call', handleIncomingCall);
         }
-
-        function handleNewConnection(conn) {
-            connections.add(conn);
-            updateUserList();
-
-            conn.on('close', () => {
-                connections.delete(conn);
-                updateUserList();
-            });
-
-            showNotification('New user connected');
-            
-            // If already streaming, send stream to new connection
-            if (stream) {
-                peer.call(conn.peer, stream);
+        
+        function handlePeerError(error) {
+            console.error('Peer error:', error);
+            showNotification('Connection error: ' + error.type);
+            if (error.type === 'disconnected') {
+                reconnectPeer();
             }
         }
-
-        function connectToHost(hostId) {
-            const conn = peer.connect(hostId);
-            startStreamBtn.style.display = 'none';
-            shareLinkBtn.style.display = 'none';
-            statusText.textContent = 'Connected to stream';
+        
+        function reconnectPeer() {
+            if (peer && !peer.destroyed) {
+                peer.reconnect();
+            } else {
+                initPeer();
+            }
         }
-
+        
         async function startStreaming() {
             try {
-                // Request screen sharing with system audio
-                stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: false,
+                if (stream) {
+                    stopStreaming();
+                    return;
+                }
+        
+                stream = await captureAudioStream();
+                if (!stream || !stream.getAudioTracks().length) {
+                    throw new Error('No audio track available');
+                }
+        
+                if (!audioContext) {
+                    initAudioContext();
+                }
+        
+                processAndStreamAudio(stream);
+                updateStreamingUI(true);
+                
+                stream.getAudioTracks()[0].onended = () => {
+                    stopStreaming();
+                    showNotification('Stream ended by system');
+                };
+        
+            } catch (err) {
+                console.error('Streaming error:', err);
+                showNotification('Error: ' + err.message);
+                stopStreaming();
+            }
+        }
+        
+        async function captureAudioStream() {
+            try {
+                // Try screen capture with system audio first
+                return await navigator.mediaDevices.getDisplayMedia({
                     audio: {
                         echoCancellation: false,
                         noiseSuppression: false,
                         autoGainControl: false
-                    }
+                    },
+                    video: false
                 });
-
-                // Check if system audio was actually shared
-                const audioTrack = stream.getAudioTracks()[0];
-                if (!audioTrack) {
-                    throw new Error('No system audio selected');
-                }
-
-                // Send stream to all connected peers
-                connections.forEach(conn => {
-                    peer.call(conn.peer, stream);
-                });
-
-                startStreamBtn.textContent = 'Stop Streaming';
-                startStreamBtn.classList.add('btn-stop');
-                statusIndicator.classList.add('active');
-                statusText.textContent = 'Streaming';
-                showNotification('System audio stream started');
-
-                // Handle stream stop event (when user stops sharing)
-                audioTrack.onended = () => {
-                    stopStreaming();
-                };
             } catch (err) {
-                console.error('Error accessing system audio:', err);
-                showNotification('Error accessing system audio. Please make sure to select "Share system audio" when prompted.');
-                stopStreaming();
+                console.log('Screen capture failed, falling back to microphone');
+                // Fallback to microphone
+                return await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    },
+                    video: false
+                });
             }
         }
-
+        
+        function processAndStreamAudio(audioStream) {
+            const source = audioContext.createMediaStreamSource(audioStream);
+            source.connect(mediaStreamDestination);
+            
+            const processedStream = mediaStreamDestination.stream;
+            connections.forEach(conn => {
+                peer.call(conn.peer, processedStream);
+            });
+        }
+        
         function stopStreaming() {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
             }
-            startStreamBtn.textContent = 'Start Streaming';
-            startStreamBtn.classList.remove('btn-stop');
-            statusIndicator.classList.remove('active');
-            statusText.textContent = 'Not Streaming';
-            showNotification('Stream stopped');
+            
+            if (audioContext) {
+                audioContext.close().catch(console.error);
+                audioContext = null;
+                mediaStreamDestination = null;
+            }
+        
+            updateStreamingUI(false);
         }
-
+        
+        function updateStreamingUI(isStreaming) {
+            startStreamBtn.textContent = isStreaming ? 'Stop Stream' : 'Start Stream';
+            startStreamBtn.classList.toggle('btn-stop', isStreaming);
+            statusIndicator.classList.toggle('active', isStreaming);
+            statusContainer.classList.toggle('streaming', isStreaming);
+            statusText.textContent = isStreaming ? 'Streaming' : 'Not Streaming';
+            showNotification(isStreaming ? 'Stream started' : 'Stream stopped');
+        }
+        
+        function handleNewConnection(conn) {
+            connections.add(conn);
+            updateUserList();
+            showNotification('New user connected');
+            
+            if (stream && mediaStreamDestination) {
+                peer.call(conn.peer, mediaStreamDestination.stream);
+            }
+            
+            conn.on('close', () => {
+                connections.delete(conn);
+                updateUserList();
+                showNotification('User disconnected');
+            });
+        
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+                connections.delete(conn);
+                updateUserList();
+            });
+        }
+        
+        function handleIncomingCall(call) {
+            call.answer();
+            call.on('stream', remoteStream => {
+                const audio = new Audio();
+                audio.srcObject = remoteStream;
+                audio.play().catch(e => console.error('Playback error:', e));
+            });
+        
+            call.on('error', (err) => {
+                console.error('Call error:', err);
+                showNotification('Call error: ' + err.message);
+            });
+        }
+        
+        function connectToHost(hostId) {
+            const conn = peer.connect(hostId);
+            conn.on('open', () => {
+                startStreamBtn.style.display = 'none';
+                shareLinkBtn.style.display = 'none';
+                statusContainer.style.display = 'none';
+                showNotification('Connected to host');
+            });
+        
+            conn.on('error', (err) => {
+                console.error('Host connection error:', err);
+                showNotification('Failed to connect to host');
+            });
+        }
+        
         function updateUserList() {
             userList.innerHTML = '';
             connections.forEach(conn => {
@@ -389,8 +513,8 @@
                 li.className = 'user-item';
                 li.innerHTML = `
                     <span>User ${conn.peer.slice(0, 6)}...</span>
-                    <button class="btn" onclick="disconnectUser('${conn.peer}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <button class="btn-disconnect" onclick="disconnectUser('${conn.peer}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 6L6 18M6 6l12 12"></path>
                         </svg>
                     </button>
@@ -398,15 +522,17 @@
                 userList.appendChild(li);
             });
         }
-
+        
         function disconnectUser(peerId) {
             connections.forEach(conn => {
                 if (conn.peer === peerId) {
                     conn.close();
+                    connections.delete(conn);
                 }
             });
+            updateUserList();
         }
-
+        
         function showNotification(message) {
             notification.textContent = message;
             notification.style.display = 'block';
@@ -414,23 +540,28 @@
                 notification.style.display = 'none';
             }, 3000);
         }
-
-        startStreamBtn.addEventListener('click', () => {
-            if (!stream) {
-                startStreaming();
-            } else {
-                stopStreaming();
-            }
-        });
-
+        
+        // Event Listeners
+        startStreamBtn.addEventListener('click', startStreaming);
+        
         shareLinkBtn.addEventListener('click', () => {
             const url = `${window.location.origin}${window.location.pathname}?host=${peer.id}`;
             navigator.clipboard.writeText(url);
             showNotification('Share link copied to clipboard');
         });
-
-        // Initialize the application
-        initPeer();
+        
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            initPeer();
+            initAudioContext();
+        });
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && stream) {
+                stopStreaming();
+            }
+        });
     </script>
 </body>
 </html>
