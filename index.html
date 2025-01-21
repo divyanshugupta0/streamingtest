@@ -372,21 +372,30 @@
                     return;
                 }
         
-                stream = await captureAudioStream();
+                // Get system audio stream
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    audio: true,
+                    video: false
+                });
+        
                 if (!stream || !stream.getAudioTracks().length) {
                     throw new Error('No audio track available');
                 }
         
-                if (!audioContext) {
-                    initAudioContext();
-                }
+                // Call all connected peers with the raw stream
+                connections.forEach(conn => {
+                    const call = peer.call(conn.peer, stream);
+                    call.on('error', (err) => {
+                        console.error('Call error:', err);
+                        showNotification('Call failed: ' + err.message);
+                    });
+                });
         
-                processAndStreamAudio(stream);
                 updateStreamingUI(true);
                 
                 stream.getAudioTracks()[0].onended = () => {
                     stopStreaming();
-                    showNotification('Stream ended by system');
+                    showNotification('Stream ended');
                 };
         
             } catch (err) {
@@ -460,20 +469,19 @@
             updateUserList();
             showNotification('New user connected');
             
-            if (stream && mediaStreamDestination) {
-                peer.call(conn.peer, mediaStreamDestination.stream);
+            // If already streaming, call the new connection
+            if (stream) {
+                const call = peer.call(conn.peer, stream);
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                    showNotification('Call failed: ' + err.message);
+                });
             }
             
             conn.on('close', () => {
                 connections.delete(conn);
                 updateUserList();
                 showNotification('User disconnected');
-            });
-        
-            conn.on('error', (err) => {
-                console.error('Connection error:', err);
-                connections.delete(conn);
-                updateUserList();
             });
         }
         
@@ -482,12 +490,15 @@
             call.on('stream', remoteStream => {
                 const audio = new Audio();
                 audio.srcObject = remoteStream;
-                audio.play().catch(e => console.error('Playback error:', e));
-            });
-        
-            call.on('error', (err) => {
-                console.error('Call error:', err);
-                showNotification('Call error: ' + err.message);
+                audio.autoplay = true;
+                document.body.appendChild(audio); // Keep audio element in DOM
+                
+                audio.onloadedmetadata = () => {
+                    audio.play().catch(e => {
+                        console.error('Playback error:', e);
+                        showNotification('Playback failed: ' + e.message);
+                    });
+                };
             });
         }
         
