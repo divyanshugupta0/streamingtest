@@ -237,7 +237,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Live Audio Stream</h1>
+            <h1>System Audio Stream</h1>
             <div class="status">
                 <div class="status-indicator" id="statusIndicator"></div>
                 <span id="statusText">Not Streaming</span>
@@ -263,9 +263,7 @@
 
         <div class="connected-users">
             <h2>Connected Users</h2>
-            <ul class="user-list" id="userList">
-                <!-- Connected users will be inserted here -->
-            </ul>
+            <ul class="user-list" id="userList"></ul>
         </div>
     </div>
 
@@ -282,7 +280,6 @@
         const statusText = document.getElementById('statusText');
         const notification = document.getElementById('notification');
 
-        // Initialize PeerJS
         function initPeer() {
             peer = new Peer();
             
@@ -319,6 +316,11 @@
             });
 
             showNotification('New user connected');
+            
+            // If already streaming, send stream to new connection
+            if (stream) {
+                peer.call(conn.peer, stream);
+            }
         }
 
         function connectToHost(hostId) {
@@ -330,14 +332,23 @@
 
         async function startStreaming() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
+                // Request screen sharing with system audio
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: false,
                     audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
                     }
                 });
 
+                // Check if system audio was actually shared
+                const audioTrack = stream.getAudioTracks()[0];
+                if (!audioTrack) {
+                    throw new Error('No system audio selected');
+                }
+
+                // Send stream to all connected peers
                 connections.forEach(conn => {
                     peer.call(conn.peer, stream);
                 });
@@ -346,10 +357,16 @@
                 startStreamBtn.classList.add('btn-stop');
                 statusIndicator.classList.add('active');
                 statusText.textContent = 'Streaming';
-                showNotification('Stream started');
+                showNotification('System audio stream started');
+
+                // Handle stream stop event (when user stops sharing)
+                audioTrack.onended = () => {
+                    stopStreaming();
+                };
             } catch (err) {
-                console.error('Error accessing microphone:', err);
-                showNotification('Error accessing microphone');
+                console.error('Error accessing system audio:', err);
+                showNotification('Error accessing system audio. Please make sure to select "Share system audio" when prompted.');
+                stopStreaming();
             }
         }
 
