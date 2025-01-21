@@ -304,6 +304,7 @@
         let connections = new Set();
         let audioContext;
         let mediaStreamDestination;
+        let isStreaming = false;
         
         // DOM Elements
         const startStreamBtn = document.getElementById('startStream');
@@ -367,12 +368,11 @@
         
         async function startStreaming() {
             try {
-                if (stream) {
+                if (isStreaming) {
                     stopStreaming();
                     return;
                 }
         
-                // Get system audio stream
                 stream = await navigator.mediaDevices.getDisplayMedia({
                     audio: true,
                     video: false
@@ -382,26 +382,17 @@
                     throw new Error('No audio track available');
                 }
         
-                // Call all connected peers with the raw stream
                 connections.forEach(conn => {
                     const call = peer.call(conn.peer, stream);
-                    call.on('error', (err) => {
-                        console.error('Call error:', err);
-                        showNotification('Call failed: ' + err.message);
-                    });
+                    call.on('error', handleCallError);
                 });
         
+                stream.getAudioTracks()[0].onended = handleStreamEnd;
+                isStreaming = true;
                 updateStreamingUI(true);
-                
-                stream.getAudioTracks()[0].onended = () => {
-                    stopStreaming();
-                    showNotification('Stream ended');
-                };
         
             } catch (err) {
-                console.error('Streaming error:', err);
-                showNotification('Error: ' + err.message);
-                stopStreaming();
+                handleStreamError(err);
             }
         }
         
@@ -445,14 +436,22 @@
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
             }
-            
-            if (audioContext) {
-                audioContext.close().catch(console.error);
-                audioContext = null;
-                mediaStreamDestination = null;
-            }
-        
+            isStreaming = false;
             updateStreamingUI(false);
+        }
+        function handleStreamEnd() {
+            stopStreaming();
+            showNotification('Stream ended');
+        }
+        function handleStreamError(err) {
+            console.error('Streaming error:', err);
+            showNotification('Error: ' + err.message);
+            stopStreaming();
+        }
+        
+        function handleCallError(err) {
+            console.error('Call error:', err);
+            showNotification('Call failed: ' + err.message);
         }
         
         function updateStreamingUI(isStreaming) {
