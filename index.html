@@ -367,52 +367,52 @@
         }
         
         async function startStreaming() {
-    try {
-        if (isStreaming) {
-            stopStreaming();
-            return;
-        }
-
-        // Try getUserMedia first for mic audio
-        stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false
-            },
-            video: false
-        }).catch(async () => {
-            // Fallback to getDisplayMedia for system audio
-            return await navigator.mediaDevices.getDisplayMedia({
-                audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false
-                },
-                video: {
-                    width: 1,
-                    height: 1
+            try {
+                if (isStreaming) {
+                    stopStreaming();
+                    return;
                 }
-            });
-        });
-
-        if (!stream || !stream.getAudioTracks().length) {
-            throw new Error('No audio track available');
+        
+                // Try getUserMedia first for mic audio
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    },
+                    video: false
+                }).catch(async () => {
+                    // Fallback to getDisplayMedia for system audio
+                    return await navigator.mediaDevices.getDisplayMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        },
+                        video: {
+                            width: 1,
+                            height: 1
+                        }
+                    });
+                });
+        
+                if (!stream || !stream.getAudioTracks().length) {
+                    throw new Error('No audio track available');
+                }
+        
+                connections.forEach(conn => {
+                    const call = peer.call(conn.peer, stream);
+                    call.on('error', handleCallError);
+                });
+        
+                stream.getAudioTracks()[0].onended = handleStreamEnd;
+                isStreaming = true;
+                updateStreamingUI(true);
+        
+            } catch (err) {
+                handleStreamError(err);
+            }
         }
-
-        connections.forEach(conn => {
-            const call = peer.call(conn.peer, stream);
-            call.on('error', handleCallError);
-        });
-
-        stream.getAudioTracks()[0].onended = handleStreamEnd;
-        isStreaming = true;
-        updateStreamingUI(true);
-
-    } catch (err) {
-        handleStreamError(err);
-    }
-}
         
         async function captureAudioStream() {
             try {
@@ -505,18 +505,28 @@
         function handleIncomingCall(call) {
             call.answer();
             call.on('stream', remoteStream => {
-                const audio = new Audio();
-                audio.srcObject = remoteStream;
-                audio.autoplay = true;
-                document.body.appendChild(audio); // Keep audio element in DOM
-                
-                audio.onloadedmetadata = () => {
-                    audio.play().catch(e => {
-                        console.error('Playback error:', e);
-                        showNotification('Playback failed: ' + e.message);
-                    });
-                };
+                playAudio(remoteStream);
             });
+        }
+        function playAudio(remoteStream) {
+            const audio = new Audio();
+            audio.srcObject = remoteStream;
+            
+            // Create play button for first interaction
+            const playButton = document.createElement('button');
+            playButton.textContent = 'Start Listening';
+            playButton.className = 'btn';
+            document.querySelector('.controls').appendChild(playButton);
+            
+            playButton.onclick = async () => {
+                try {
+                    await audio.play();
+                    playButton.remove();
+                } catch (err) {
+                    console.error('Playback error:', err);
+                    showNotification('Playback failed: ' + err.message);
+                }
+            };
         }
         
         function connectToHost(hostId) {
